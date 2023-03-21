@@ -44,7 +44,7 @@ class AbstractProblem: #here "queens" is also the size (number of rows and colum
 
             print('\n')
 
-    def result(self, queenMove: tuple): #queenMove is a tuple that contains the place of the queen after moving (e.g: ("0","1"))
+    def result(self, queenMove: tuple): #queenMove is a tuple that contains the place of the queen after moving (e.g: ("0","1") means the queen got moved to (0,1)
         new = list(self.position)
         new[queenMove[0]] = queenMove[1]
         return new
@@ -58,7 +58,7 @@ class AbstractProblem: #here "queens" is also the size (number of rows and colum
         return True
 
     def g(self, cost: int, _parentState, _childState): #a step has the cost of 1
-        return cost+1
+        return cost + 1
             
     def h(self):  #calculate heuristics value
         invalids = 0
@@ -68,8 +68,14 @@ class AbstractProblem: #here "queens" is also the size (number of rows and colum
                     invalids += 1
         return invalids
 
-    def fitnessFunction(self):
-        return 1/(1+self.h() + 1)
+    def fitnessFunction(self): #fitness function that reaches the max value of 1 when there are no attacking queens
+        return 1 / (1 + self.h())
+
+    def __gt__(self, other):
+        return self.fitnessFunction() > other.fitnessFunction()
+
+    def __lt__(self, other):
+        return self.fitnessFunction() < other.fitnessFunction()
 
 class StateNode:
     state: AbstractProblem
@@ -77,7 +83,6 @@ class StateNode:
     parent: AbstractProblem
     path_cost: int
     queenMove: tuple
-    depth: int
     
     def __init__(self, _state: AbstractProblem, _parent=None, _cost=0, _move=None, _heuristics=0):
         self.state = _state
@@ -85,21 +90,9 @@ class StateNode:
         self.path_cost = _cost
         self.queenMove = _move
         self.heuristics = _heuristics
-        if _parent:
-            self.depth = _parent.depth + 1
-        else:
-            self.depth = 0
-    def setCost(self, _cost: int):
-        self.path_cost = _cost
-    
-    def setParent(self, _parent: AbstractProblem):
-        self.parent = _parent 
-        
-    def setHeuristics(self, _heuristics:int):
-        self.heuristics = _heuristics
 
     def genSuccessors(self, problem: AbstractProblem):
-        return [self.genChildNode(problem,move) for move in problem.genQueenMoves()]
+        return [self.genChildNode(problem, move) for move in problem.genQueenMoves()]
 
     def genChildNode(self, problem: AbstractProblem, queenMove: tuple):
         pass
@@ -134,6 +127,7 @@ class AStarNode(StateNode):
     def __lt__(self, otherNode):
         return (self.path_cost + self.heuristics) < (otherNode.path_cost + otherNode.heuristics)
 
+
 def Search(node: StateNode):
     frontier = [node]
     heapq.heapify(frontier)
@@ -141,32 +135,76 @@ def Search(node: StateNode):
     expanded_list.add(node.state)
     while frontier:
         currentNode = heapq.heappop(frontier)
-        if currentNode.state.goalTest():  
+        if currentNode.state.goalTest():
             return currentNode
         if currentNode in expanded_list:
             continue
         children = currentNode.genSuccessors(currentNode.state)  # expand child
         expanded_list.add(currentNode.state)
         for child in children:
-            if child in frontier:
-                continue
             if child.state not in expanded_list:
                 heapq.heappush(frontier, child)
-                
-    return None  #no solution
+
+    return None  # no solution
+
 
 def UCSSearch(initState: AbstractProblem):
     initialState = UCSNode(initState)
     return Search(initialState)
 
+
 def AStarSearch(initState: AbstractProblem):
     initialState = AStarNode(initState)
     return Search(initialState)
+
+def genInitPopulation(initState: AbstractProblem, size):
+    initPopulation = [initState]
+    heapq.heapify(initPopulation)
+    for i in range(size*size):
+        chromo = AbstractProblem(size)
+        if chromo in initPopulation:
+            continue
+        else: heapq.heappush(initPopulation, chromo)
+    initPopulation = initPopulation[0:(size*size//2)]
+    return initPopulation
+def Mutate(chromo: AbstractProblem):
+    MutatePoint = random.randint(0, chromo.queens - 1)
+    MutateValue = random.randint(0, chromo.queens - 1)
+    chromo.position[MutatePoint] = MutateValue
+    return chromo
+
+def crossOver(first_chromo: AbstractProblem, second_chromo: AbstractProblem):
+    firstNewChild = first_chromo
+    secondNewChild = second_chromo
+
+    cuttingPoint = random.randint(0, len(first_chromo.position) - 1) #random cutting position
+    firstNewChild.updatePosition(first_chromo.position[0:cuttingPoint] + second_chromo.position[cuttingPoint: second_chromo.queens])
+    secondNewChild.updatePosition(second_chromo.position[0:cuttingPoint] + first_chromo.position[cuttingPoint: first_chromo.queens])
+
+    mutate = random.random()
+    if (mutate <= mutateProbability):
+        firstNewChild = Mutate(firstNewChild)
+        secondNewChild = Mutate(secondNewChild)
+
+    return firstNewChild, secondNewChild
+
+def geneticAlgorithm(initState, size):
+    population = genInitPopulation(initState, size)
+    heapq.heapify(population)
+    while population[0].fitnessFunction() != maxFitness:
+        bestChromo1 = heapq.heappop(population)
+        bestChromo2 = heapq.heappop(population)
+        newChromo1, newChromo2 = crossOver(bestChromo1, bestChromo2)
+        heapq.heappush(population, newChromo1)
+        heapq.heappush(population, newChromo2)
+        population = population[0:size]
+    return population[0]
 
 if __name__ == "__main__":
     process = psutil.Process(os.getpid())
     start_time = time.time()
     print("Please enter the number of queens: ")
+
     N = input()
     N = int(N)
     print("Enter the algorithm: ")
@@ -177,7 +215,7 @@ if __name__ == "__main__":
     choice = input()
     choice = int(choice)
 
-    testBoard = AbstractProblem(N)
+    testBoard = AbstractProblem(N) #this can be treated as one chromosome
 
     print("Initial State: ")
     print(testBoard.getPosition())
@@ -219,5 +257,19 @@ if __name__ == "__main__":
                 print("Can't find the answer")
 
         else:
-            pass
+            maxFitness = 1
+            mutateProbability = 0.3
+            result = geneticAlgorithm(testBoard,N)
+            print("Result: ")
+            result.printBoard()
+            print("Runtime: --- %s seconds ---" % (time.time() - start_time) + '\n')
+            print("Memory: --- ", end="")
+            print(process.memory_info().rss / (1024 * 1024), end="")
+            print(" MB ---", end="")
+
+
+
+
+
+
 
