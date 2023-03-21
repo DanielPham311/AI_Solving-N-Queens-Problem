@@ -139,7 +139,7 @@ def Search(node: StateNode):
             return currentNode
         if currentNode in expanded_list:
             continue
-        children = currentNode.genSuccessors(currentNode.state)  # expand child
+        children = currentNode.genSuccessors(currentNode.state)  #generate child nodes
         expanded_list.add(currentNode.state)
         for child in children:
             if child.state not in expanded_list:
@@ -167,6 +167,7 @@ def genInitPopulation(initState: AbstractProblem, size):
         else: heapq.heappush(initPopulation, chromo)
     initPopulation = initPopulation[0:(size*size//2)]
     return initPopulation
+
 def Mutate(chromo: AbstractProblem):
     MutatePoint = random.randint(0, chromo.queens - 1)
     MutateValue = random.randint(0, chromo.queens - 1)
